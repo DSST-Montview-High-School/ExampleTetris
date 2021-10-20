@@ -12,7 +12,6 @@ TODO
   Add counter-clockwise rotation and flips.
   Add leeway to move block before placing.
   Change piece generation to not be completely random.
-  Clean up piece handling.
 """
 
 import random
@@ -25,13 +24,14 @@ import numpy as np
 clock = pygame.time.Clock()
 pygame.display.init()
 
+# Set display size from screen size
 dispInfo = pygame.display.Info()
 sizex, sizey = dispInfo.current_w, dispInfo.current_h
 
-display = pygame.display.set_mode((sizex, sizey), pygame.FULLSCREEN)
+display = pygame.display.set_mode((sizex, sizey))
 
 # Input settings
-pygame.key.set_repeat(100, 40)
+pygame.key.set_repeat(120, 50)
 
 # Define shape colors and shapes
 colors = {
@@ -41,7 +41,7 @@ colors = {
     4: (255, 255, 0),
     5: (255, 128, 0),
     6: (0, 255, 0),
-    7: (0, 0, 255), 255: (100, 100, 100)
+    7: (0, 0, 255)
 }
 
 shapes = {
@@ -87,10 +87,12 @@ class Piece:
     """
     def __init__(self, shape=None):
         if shape:
-            self.shape = shape
+            self.col = shape
 
         else:
-            self.shape = random.randint(1, len(shapes))
+            self.col = random.randint(1, len(shapes))
+
+        self.offs = shapes[self.col]
 
         self.pos = [5, 3]
         self.rot = 0
@@ -106,23 +108,49 @@ class Piece:
         Method that rotates a piece clockwise once.
         """
         self.rot = (self.rot + 1) % 4
+        self.offs = shapes[self.col]
+
+        if self.rot % 2:
+            self.offs = np.flip(self.offs) * (-1, 1)
+
+        if self.rot > 1:
+            self.offs = np.negative(self.offs)
 
     def collide(self, grid, exp):
         """
         Method that detects collision with the board from a certain offset.
         """
-        for off in shapes[self.shape]:
-            if (self.rot % 2):
-                off = np.flip(off) * (-1, 1)
-
-            if self.rot > 1:
-                off = np.negative(off)
-
+        for off in self.offs:
             if (self.pos[1] + off[1] + exp[1] >= 20
                or self.pos[0] + off[0] + exp[0] not in range(10)
-               or grid[self.pos[0] + off[0] + exp[0], self.pos[1] + off[1] + exp[1]] not in {0, 255}
+               or grid[self.pos[0] + off[0] + exp[0], self.pos[1] + off[1] + exp[1]] != 0
                ):
                 return True
+
+        return False
+
+    def render(self):
+        """
+        Method that renders the current piece to the display.
+        """
+        for off in self.offs:
+            pos = pygame.Rect((250 // (1920/sizex)) + SIZE * (self.pos[0] + off[0]), (100 // (1080/sizey)) + SIZE * (self.pos[1] + off[1]), SIZE, SIZE)
+            pygame.draw.rect(display, colors[self.col], pos)
+
+    def ghostrender(self):
+        """
+        Render the ghost block where the current block will collide at.
+        """
+        # Find how far piece can currently fall (for ghost block)
+        blocks = 0
+
+        while not(b.piece.collide(b.grid, (0, blocks + 1))):
+            blocks += 1
+
+        # Display ghost piece
+        for off in self.offs:
+            pos = pygame.Rect((250 // (1920/sizex)) + SIZE * (self.pos[0] + off[0]), (100 // (1080/sizey)) + SIZE * (self.pos[1] + off[1] + blocks), SIZE, SIZE)
+            pygame.draw.rect(display, (100, 100, 100), pos)
 
 # Create board
 b = Board()
@@ -146,18 +174,12 @@ while True:
             print('Died')
             break
 
-##    else:
-##        if b.piece.collide(b.grid, (0, 1)):
-##            b.piece = piece()
-
+    # Initialize frame state
     hold = False
     i += 1
     placed -= 1
 
     display.blit(background, [0, 0])
-
-##    for off in shapes[b.piece.shape]:
-##        b.grid[tuple(np.array(b.piece.pos) + off)] = 0
 
     # Gravity (every 20 frames)
     if not(i % 20) and b.piece:
@@ -190,7 +212,7 @@ while True:
                     for x in range(3):
                         b.piece.rotate()
 
-            # Place piece if long enough since last placement
+            # Place piece if pressed and long enough since last placement
             elif event.key == pygame.K_SPACE and placed < 0:
                 while not(b.piece.collide(b.grid, (0, 1))):
                     b.piece.move()
@@ -198,91 +220,32 @@ while True:
             elif event.key == pygame.K_c:
                 hold = True
 
-    # Set current piece on board (FIXME: Don't place, and instead render separately to simplify collision)
-    for off in shapes[b.piece.shape]:
-        if b.piece.rot % 2:
-            off = np.flip(off) * (-1, 1)
-
-        if b.piece.rot > 1:
-            off = np.negative(off)
-
-        b.grid[tuple(np.array(b.piece.pos) + off)] = b.piece.shape
-
-    # Render board
+    # Render board and pieces
     b.render()
 
-    b.grid = np.where(b.grid == 255, 0, b.grid)
+    if b.piece:
+        b.piece.ghostrender()
 
-    # Remove current piece from board
-    for off in shapes[b.piece.shape]:
-        if b.piece.rot % 2:
-            off = np.flip(off) * (-1, 1)
-
-        if b.piece.rot > 1:
-            off = np.negative(off)
-
-        b.grid[tuple(np.array(b.piece.pos) + off)] = 0
-
-    # Find how far piece can currently fall (for ghost block)
-    blocks = 0
-
-    while not(b.piece.collide(b.grid, (0, blocks))):
-        blocks += 1
-
-    # Put ghost piece on board (shouldn't need to)
-    for off in shapes[b.piece.shape]:
-        if b.piece.rot % 2:
-            off = np.flip(off) * (-1, 1)
-
-        if b.piece.rot > 1:
-            off = np.negative(off)
-
-        if b.grid[tuple(np.array(b.piece.pos) + off + (0, blocks - 1))] == 0:
-            b.grid[tuple(np.array(b.piece.pos) + off + (0, blocks - 1))] = 255
-
-##    for off in shapes[b.piece.shape]:
-##        if b.piece.rot % 2:
-##            off = np.flip(off) * (-1, 1)
-##
-##        if b.piece.rot > 1:
-##            off = np.negative(off)
+    b.piece.render()
 
     # Place piece if about to hit groud
     if b.piece.collide(b.grid, (0, 1)):
-        for off in shapes[b.piece.shape]:
-            if b.piece.rot % 2:
-                off = np.flip(off) * (-1, 1)
-
-            if b.piece.rot > 1:
-                off = np.negative(off)
-
-            b.grid[tuple(np.array(b.piece.pos) + off)] = b.piece.shape
+        for off in b.piece.offs:
+            b.grid[tuple(np.array(b.piece.pos) + off)] = b.piece.col
 
         b.piece = None
 
         placed = 5
-##        break
-
-    # Remove current piece from board
-    if b.piece:
-        for off in shapes[b.piece.shape]:
-            if b.piece.rot % 2:
-                off = np.flip(off) * (-1, 1)
-
-            if b.piece.rot > 1:
-                off = np.negative(off)
-
-            b.grid[tuple(np.array(b.piece.pos) + off)] = 0
 
     # Replace piece if hold is input
     if hold:
         if b.held:
-            n = b.piece.shape
+            n = b.piece.col
             b.piece = Piece(b.held)
             b.held = n
 
         else:
-            b.held = b.piece.shape
+            b.held = b.piece.col
             b.piece = Piece()
 
     # Refresh display
