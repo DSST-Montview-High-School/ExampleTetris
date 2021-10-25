@@ -4,8 +4,7 @@ Example project using pygame, but including some more advanced concepts.
 Requires numpy to run.
 
 TODO
-  Change input handling to prevent repeat rotations.
-  Change input handling to move pieces on hold, even after pressing another key.
+  Change input handling to not allow multiple directions at once.
   Make blocks rotate correctly.
   Handle losing.
   Display next and hold pieces.
@@ -31,7 +30,8 @@ sizex, sizey = dispInfo.current_w, dispInfo.current_h
 display = pygame.display.set_mode((sizex, sizey))
 
 # Input settings
-pygame.key.set_repeat(120, 50)
+delays = [8, 3]
+holdNums = [delays[0]] * 3
 
 # Define shape colors and shapes
 colors = {
@@ -190,28 +190,16 @@ while True:
             pygame.quit()
             sys.exit(1)
 
-        # Handle input
+        # Handle single inputs
         elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_LEFT and b.piece.pos[0] > 0:
-                if not(b.piece.collide(b.grid, (-1, 0))):
-                    b.piece.pos[0] -= 1
-
-            elif event.key == pygame.K_RIGHT and b.piece.pos[0] < 9:
-                if not(b.piece.collide(b.grid, (1, 0))):
-                    b.piece.pos[0] += 1
-
-            elif event.key == pygame.K_DOWN:
-                if not(b.piece.collide(b.grid, (0, 1))):
-                    b.piece.move()
-
-            elif event.key == pygame.K_UP:
+            if event.key == pygame.K_UP:
                 b.piece.rotate()
 
                 # Unrotate if rotation makes piece collide
                 if b.piece.collide(b.grid, (0, 0)):
                     for x in range(3):
                         b.piece.rotate()
-
+            
             # Place piece if pressed and long enough since last placement
             elif event.key == pygame.K_SPACE and placed < 0:
                 while not(b.piece.collide(b.grid, (0, 1))):
@@ -219,6 +207,45 @@ while True:
 
             elif event.key == pygame.K_c:
                 hold = True
+
+    # Handle repeated inputs
+    keys = pygame.key.get_pressed()
+
+    if keys[pygame.K_LEFT] and b.piece.pos[0] > 0:
+        if not(b.piece.collide(b.grid, (-1, 0))) and holdNums[0] in {0, delays[0]}:
+            b.piece.pos[0] -= 1
+
+            if not(holdNums[0]):
+                holdNums[0] = delays[1]
+
+        holdNums[0] = max(holdNums[0] - 1, 0)
+
+    else:
+        holdNums[0] = delays[0]
+
+    if keys[pygame.K_RIGHT] and b.piece.pos[0] < 9:
+        if not(b.piece.collide(b.grid, (1, 0))) and holdNums[1] in {0, delays[0]}:
+            b.piece.pos[0] += 1
+
+            if not(holdNums[1]):
+                holdNums[1] = delays[1]
+
+        holdNums[1] = max(holdNums[1] - 1, 0)
+
+    else:
+        holdNums[1] = delays[0]
+
+    if keys[pygame.K_DOWN]:
+        if not(b.piece.collide(b.grid, (0, 1))) and holdNums[2] in {0, delays[0]}:
+            b.piece.move()
+
+            if not(holdNums[2]):
+                holdNums[2] = delays[1]
+
+        holdNums[2] = max(holdNums[2] - 1, 0)
+
+    else:
+        holdNums[2] = delays[0]
 
     # Render board and pieces
     b.render()
