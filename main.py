@@ -8,8 +8,6 @@ TODO
   Make blocks rotate correctly.
   Handle losing.
   Display next and hold pieces.
-  Add counter-clockwise rotation and flips.
-  Add leeway to move block before placing.
   Change piece generation to not be completely random.
 """
 
@@ -157,6 +155,11 @@ b = Board()
 
 i = 0
 placed = 1
+lock = 0
+totlock = 0
+locks = [20, 120]
+lines = 0
+lasthold = False
 
 # Game loop
 while True:
@@ -165,6 +168,7 @@ while True:
         for row in range(b.grid.shape[1]):
             if np.all(b.grid[:,row]):
                 b.grid[:,1:row + 1] = b.grid[:,:row]
+                lines += 1
 
         # Create new piece
         b.piece = Piece()
@@ -181,8 +185,8 @@ while True:
 
     display.blit(background, [0, 0])
 
-    # Gravity (every 20 frames)
-    if not(i % 20) and b.piece:
+    # Gravity
+    if not(i % (20 - min(19, lines // 6))) and b.piece and not(b.piece.collide(b.grid, (0, 1))):
         b.piece.move()
 
     for event in pygame.event.get():
@@ -194,16 +198,38 @@ while True:
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_UP:
                 b.piece.rotate()
+                lock = 0
 
                 # Unrotate if rotation makes piece collide
                 if b.piece.collide(b.grid, (0, 0)):
                     for x in range(3):
                         b.piece.rotate()
-            
+
+            elif event.key == pygame.K_a:
+                b.piece.rotate()
+                b.piece.rotate()
+                lock = 0
+
+                # Unrotate if rotation makes piece collide
+                if b.piece.collide(b.grid, (0, 0)):
+                    for x in range(2):
+                        b.piece.rotate()
+
+            elif event.key == pygame.K_z:
+                for x in range(3):
+                    b.piece.rotate()
+                lock = 0
+
+                # Unrotate if rotation makes piece collide
+                if b.piece.collide(b.grid, (0, 0)):
+                    b.piece.rotate()
+
             # Place piece if pressed and long enough since last placement
             elif event.key == pygame.K_SPACE and placed < 0:
                 while not(b.piece.collide(b.grid, (0, 1))):
                     b.piece.move()
+
+                totlock = locks[1]
 
             elif event.key == pygame.K_c:
                 hold = True
@@ -219,6 +245,7 @@ while True:
                 holdNums[0] = delays[1]
 
         holdNums[0] = max(holdNums[0] - 1, 0)
+        lock = 0
 
     else:
         holdNums[0] = delays[0]
@@ -231,6 +258,7 @@ while True:
                 holdNums[1] = delays[1]
 
         holdNums[1] = max(holdNums[1] - 1, 0)
+        lock = 0
 
     else:
         holdNums[1] = delays[0]
@@ -257,15 +285,24 @@ while True:
 
     # Place piece if about to hit groud
     if b.piece.collide(b.grid, (0, 1)):
-        for off in b.piece.offs:
-            b.grid[tuple(np.array(b.piece.pos) + off)] = b.piece.col
+        if lock >= locks[0] or totlock >= locks[1]:
+            for off in b.piece.offs:
+                b.grid[tuple(np.array(b.piece.pos) + off)] = b.piece.col
 
-        b.piece = None
+            b.piece = None
 
-        placed = 5
+            placed = 5
+            lock = 0
+            totlock = 0
+
+            lasthold = False
+        
+        else:
+            lock += 1
+            totlock += 1
 
     # Replace piece if hold is input
-    if hold:
+    if hold and not(lasthold):
         if b.held:
             n = b.piece.col
             b.piece = Piece(b.held)
@@ -274,6 +311,11 @@ while True:
         else:
             b.held = b.piece.col
             b.piece = Piece()
+
+            lock = 0
+            totlock = 0
+        
+        lasthold = True
 
     # Refresh display
     pygame.display.update()
