@@ -8,7 +8,6 @@ TODO
   Make blocks rotate correctly.
   Handle losing.
   Display next and hold pieces.
-  Change piece generation to not be completely random.
 """
 
 import random
@@ -66,6 +65,9 @@ class Board:
         self.grid = np.zeros((10, 20), np.uint8)
         self.held = None
 
+        self.bag = list(shapes.keys())
+        random.shuffle(self.bag)
+
     def render(self):
         """
         Method that renders the current board state to the display, with all placed pieces.
@@ -78,17 +80,30 @@ class Board:
                     # Draw square at potion based off of screen size
                     pos = pygame.Rect((250 // (1920/sizex)) + SIZE * x, (100 // (1080/sizey)) + SIZE * y, SIZE, SIZE)
                     pygame.draw.rect(display, colors[col], pos)
+    
+    def getPiece(self):
+        """
+        Method that returns the next piece from the random bag.
+        """
+        if len(self.bag) < 7:
+            add = list(shapes.keys())
+            random.shuffle(self.bag)
+            self.bag += add
+        
+        return self.bag.pop()
 
 class Piece:
     """
     Piece class containing methods to handle unplaced piece interaction.
     """
-    def __init__(self, shape=None):
+    def __init__(self, board, shape=None):
+        self.board = board
+
         if shape:
             self.col = shape
 
         else:
-            self.col = random.randint(1, len(shapes))
+            self.col = b.getPiece()
 
         self.offs = shapes[self.col]
 
@@ -171,7 +186,7 @@ while True:
                 lines += 1
 
         # Create new piece
-        b.piece = Piece()
+        b.piece = Piece(b)
 
         # Collided on piece spawn (dead)
         if b.piece.collide(b.grid, (0, 0)):
@@ -305,12 +320,12 @@ while True:
     if hold and not(lasthold):
         if b.held:
             n = b.piece.col
-            b.piece = Piece(b.held)
+            b.piece = Piece(b, b.held)
             b.held = n
 
         else:
             b.held = b.piece.col
-            b.piece = Piece()
+            b.piece = Piece(b)
 
             lock = 0
             totlock = 0
