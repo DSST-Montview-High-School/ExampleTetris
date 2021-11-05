@@ -55,6 +55,7 @@ background = pygame.image.load('Tetback.png')
 
 # Set size based off of screen size
 SIZE = 40 // (1920/sizex)
+background = pygame.transform.scale(background, (SIZE * 48, SIZE * 27))
 
 class Board:
     """
@@ -198,10 +199,10 @@ while True:
     i += 1
     placed -= 1
 
-    display.blit(background, [0, 0])
+    display.blit(background, [2, 1])
 
     # Gravity
-    if not(i % (20 - min(19, lines // 6))) and b.piece and not(b.piece.collide(b.grid, (0, 1))):
+    if not(i % (18 - min(19, lines // 4))) and b.piece and not(b.piece.collide(b.grid, (0, 1))):
         b.piece.move()
 
     for event in pygame.event.get():
