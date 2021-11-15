@@ -7,7 +7,7 @@ TODO
   Change input handling to not allow multiple directions at once.
   Make blocks rotate correctly.
   Handle losing.
-  Display next and hold pieces.
+  Label next and hold pieces.
 """
 
 import random
@@ -81,17 +81,29 @@ class Board:
                     # Draw square at potion based off of screen size
                     pos = pygame.Rect((250 // (1920/sizex)) + SIZE * x, (100 // (1080/sizey)) + SIZE * y, SIZE, SIZE)
                     pygame.draw.rect(display, colors[col], pos)
-    
+
+        for i in range(4):
+            shape = shapes[self.bag[i]]
+
+            for off in shape:
+                pos = pygame.Rect(900 // (1920/sizex) + SIZE * off[0], (300 + 120 * i) // (1080/sizey) + SIZE * off[1], SIZE, SIZE)
+                pygame.draw.rect(display, colors[self.bag[i]], pos)
+
+        if self.held:
+            for off in shapes[self.held]:
+                pos = pygame.Rect(84 // (1920/sizex) + SIZE * off[0], (200) // (1080/sizey) + SIZE * off[1], SIZE, SIZE)
+                pygame.draw.rect(display, colors[self.held], pos)
+
     def getPiece(self):
         """
         Method that returns the next piece from the random bag.
         """
         if len(self.bag) < 7:
             add = list(shapes.keys())
-            random.shuffle(self.bag)
+            random.shuffle(add)
             self.bag += add
-        
-        return self.bag.pop()
+
+        return self.bag.pop(0)
 
 class Piece:
     """
