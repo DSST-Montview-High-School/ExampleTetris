@@ -6,7 +6,6 @@ Requires numpy to run.
 TODO
   Change input handling to not allow multiple directions at once.
   Possibly change input handling to repeat by milliseconds instead of frames.
-  Add kicks to block rotation.
   Handle losing.
   Label next and hold pieces.
 """
@@ -81,6 +80,27 @@ shapes = {
     ])),
 }
 
+kickTable = {
+    (0, 1): [(-1, 0), (-1, -1), (0, 2), (-1, 2)],
+    (1, 0): [(1, 0), (1, 1), (0, -2), (1, -2)],
+    (1, 2): [(1, 0), (1, 1), (0, -2), (1, -2)],
+    (2, 1): [(-1, 0), (-1, -1), (0, 2), (-1, 2)],
+    (2, 3): [(1, 0), (1, -1), (0, 2), (1, 2)],
+    (3, 2): [(-1, 0), (-1, 1), (0, -2), (-1, -2)],
+    (3, 0): [(-1, 0), (-1, -1), (0, 2), (-1, -2)],
+    (0, 3): [(1, 0), (1, -1), (0, 2), (1, 2)]
+}
+lkickTable = {
+    (0, 1): [(-2, 0), (1, 0), (-2, 1), (1, -2)],
+    (1, 0): [(2, 0), (-1, 0), (2, -1), (-1, 2)],
+    (1, 2): [(-1, 0), (2, 0), (-1, -2), (2, 1)],
+    (2, 1): [(1, 0), (-2, 0), (1, 2), (-2, -1)],
+    (2, 3): [(2, 0), (-1, 0), (2, -1), (-1, 2)],
+    (3, 2): [(-2, 0), (1, 0), (-2, 1), (1, -2)],
+    (3, 0): [(1, 0), (-2, 0), (1, 2), (-2, -1)],
+    (0, 3): [(-1, 0), (2, 0), (-1, -2), (2, 1)]
+}
+
 background = pygame.image.load('Tetback.png')
 
 # Set size based off of screen size
@@ -113,9 +133,9 @@ class Board:
                     pygame.draw.rect(display, colors[col], pos)
 
         for i in range(4):
-            shape = shapes[self.bag[i]]
+            shape = zip(*np.where(shapes[self.bag[i]]))
 
-            for off in zip(*np.where(shape)):
+            for off in shape:
                 pos = pygame.Rect(900 // (1920/sizex) + SIZE * off[0], (300 + 120 * i) // (1080/sizey) + SIZE * off[1], SIZE, SIZE)
                 pygame.draw.rect(display, colors[self.bag[i]], pos)
 
@@ -148,7 +168,8 @@ class Piece:
         else:
             self.col = b.getPiece()
 
-        self.offs = shapes[self.col]
+        self.offs = tuple(zip(*np.where(shapes[self.col])))
+        self.rot = 0
 
         self.pos = [4, 3]
 
@@ -158,18 +179,43 @@ class Piece:
         """
         self.pos[1] += 1
 
-    def rotate(self):
+    def rotate(self, num=1):
         """
         Method that rotates a piece clockwise once.
         """
+        # Do two rotations for 180 flips (so kicks work)
+        if num == 2:
+            self.rotate(1)
+            num -= 1
+
+        srot = self.rot
+        self.rot = (self.rot + num) % 4
+
         if self.col != 4:
-            self.offs = np.rot90(self.offs, 1)
+            self.offs = tuple(zip(*np.where(np.rot90(shapes[self.col], self.rot))))
+
+            if self.col == 1:
+                kicks = [(0, 0), *lkickTable[srot, self.rot]]
+
+            else:
+                kicks = [(0, 0), *kickTable[srot, self.rot]]
+
+            for kick in kicks:
+                if self.collide(self.board.grid, kick):
+                    continue
+
+                self.pos[0] += kick[0]
+                self.pos[1] += kick[1]
+                return
+
+            self.rot = (self.rot - num) % 4
+            self.offs = tuple(zip(*np.where(np.rot90(shapes[self.col], self.rot))))
 
     def collide(self, grid, exp):
         """
         Method that detects collision with the board from a certain offset.
         """
-        for off in zip(*np.where(self.offs)):
+        for off in self.offs:
             if (self.pos[1] + off[1] + exp[1] >= 20
                or self.pos[0] + off[0] + exp[0] not in range(10)
                or grid[self.pos[0] + off[0] + exp[0], self.pos[1] + off[1] + exp[1]] != 0
@@ -182,7 +228,7 @@ class Piece:
         """
         Method that renders the current piece to the display.
         """
-        for off in zip(*np.where(self.offs)):
+        for off in self.offs:
             pos = pygame.Rect((250 // (1920/sizex)) + SIZE * (self.pos[0] + off[0]), (100 // (1080/sizey)) + SIZE * (self.pos[1] + off[1]), SIZE, SIZE)
             pygame.draw.rect(display, colors[self.col], pos)
 
@@ -197,7 +243,7 @@ class Piece:
             blocks += 1
 
         # Display ghost piece
-        for off in zip(*np.where(self.offs)):
+        for off in self.offs:
             pos = pygame.Rect((250 // (1920/sizex)) + SIZE * (self.pos[0] + off[0]), (100 // (1080/sizey)) + SIZE * (self.pos[1] + off[1] + blocks), SIZE, SIZE)
             pygame.draw.rect(display, (100, 100, 100), pos)
 
@@ -237,7 +283,7 @@ while True:
     display.blit(background, [2, 1])
 
     # Gravity
-    if not(i % (18 - min(19, lines // 4))) and b.piece and not(b.piece.collide(b.grid, (0, 1))):
+    if not(i % (16 - min(15, lines // 4))) and b.piece and not(b.piece.collide(b.grid, (0, 1))):
         b.piece.move()
 
     for event in pygame.event.get():
@@ -248,32 +294,16 @@ while True:
         # Handle single inputs
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_UP:
-                b.piece.rotate()
+                b.piece.rotate(1)
                 lock = 0
-
-                # Unrotate if rotation makes piece collide
-                if b.piece.collide(b.grid, (0, 0)):
-                    for x in range(3):
-                        b.piece.rotate()
 
             elif event.key == pygame.K_a:
-                b.piece.rotate()
-                b.piece.rotate()
+                b.piece.rotate(2)
                 lock = 0
-
-                # Unrotate if rotation makes piece collide
-                if b.piece.collide(b.grid, (0, 0)):
-                    for x in range(2):
-                        b.piece.rotate()
 
             elif event.key == pygame.K_z:
-                for x in range(3):
-                    b.piece.rotate()
+                b.piece.rotate(-1)
                 lock = 0
-
-                # Unrotate if rotation makes piece collide
-                if b.piece.collide(b.grid, (0, 0)):
-                    b.piece.rotate()
 
             # Place piece if pressed and long enough since last placement
             elif event.key == pygame.K_SPACE and placed < 0:
@@ -337,7 +367,7 @@ while True:
     # Place piece if about to hit groud
     if b.piece.collide(b.grid, (0, 1)):
         if lock >= locks[0] or totlock >= locks[1]:
-            for off in zip(*np.where(b.piece.offs)):
+            for off in b.piece.offs:
                 b.grid[tuple(np.array(b.piece.pos) + off)] = b.piece.col
 
             b.piece = None
@@ -353,7 +383,7 @@ while True:
             totlock += 1
 
     # Replace piece if hold is input
-    if hold and not(lasthold):
+    if hold and not(lasthold) and b.piece:
         if b.held:
             n = b.piece.col
             b.piece = Piece(b, b.held)
