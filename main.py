@@ -171,7 +171,7 @@ class Piece:
         self.offs = tuple(zip(*np.where(shapes[self.col])))
         self.rot = 0
 
-        self.pos = [4, 3]
+        self.pos = [4, 2]
 
     def move(self):
         """
@@ -229,8 +229,9 @@ class Piece:
         Method that renders the current piece to the display.
         """
         for off in self.offs:
-            pos = pygame.Rect((250 // (1920/sizex)) + SIZE * (self.pos[0] + off[0]), (100 // (1080/sizey)) + SIZE * (self.pos[1] + off[1]), SIZE, SIZE)
-            pygame.draw.rect(display, colors[self.col], pos)
+            if self.pos[1] + off[1] > 2:
+                pos = pygame.Rect((250 // (1920/sizex)) + SIZE * (self.pos[0] + off[0]), (100 // (1080/sizey)) + SIZE * (self.pos[1] + off[1]), SIZE, SIZE)
+                pygame.draw.rect(display, colors[self.col], pos)
 
     def ghostrender(self):
         """
@@ -244,8 +245,9 @@ class Piece:
 
         # Display ghost piece
         for off in self.offs:
-            pos = pygame.Rect((250 // (1920/sizex)) + SIZE * (self.pos[0] + off[0]), (100 // (1080/sizey)) + SIZE * (self.pos[1] + off[1] + blocks), SIZE, SIZE)
-            pygame.draw.rect(display, (100, 100, 100), pos)
+            if self.pos[1] + off[1] + blocks > 2:
+                pos = pygame.Rect((250 // (1920/sizex)) + SIZE * (self.pos[0] + off[0]), (100 // (1080/sizey)) + SIZE * (self.pos[1] + off[1] + blocks), SIZE, SIZE)
+                pygame.draw.rect(display, (100, 100, 100), pos)
 
 # Create board
 b = Board()
@@ -270,9 +272,7 @@ while True:
         # Create new piece
         b.piece = Piece(b)
 
-        # Collided on piece spawn (dead)
         if b.piece.collide(b.grid, (0, 0)):
-            print('Died')
             break
 
     # Initialize frame state
@@ -371,6 +371,10 @@ while True:
                 b.grid[tuple(np.array(b.piece.pos) + off)] = b.piece.col
 
             b.piece = None
+
+            if np.any(b.grid[:,:3]):
+                print("Died")
+                break
 
             placed = 5
             lock = 0
