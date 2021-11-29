@@ -4,7 +4,6 @@ Example project using pygame, but including some more advanced concepts.
 Requires numpy to run.
 
 TODO
-  Change input handling to not allow multiple directions at once.
   Possibly change input handling to repeat by milliseconds instead of frames.
   Handle losing.
   Label next and hold pieces.
@@ -29,6 +28,9 @@ display = pygame.display.set_mode((sizex, sizey))
 # Input settings
 delays = [8, 3]
 holdNums = [delays[0]] * 3
+
+# Score amounts
+scores = [0, 40, 100, 300, 1200]
 
 # Define shape colors and shapes
 colors = {
@@ -114,6 +116,7 @@ class Board:
     def __init__(self):
         self.piece = None
         self.grid = np.zeros((10, 20), np.uint8)
+        
         self.held = None
 
         self.bag = list(shapes.keys())
@@ -166,7 +169,7 @@ class Piece:
             self.col = shape
 
         else:
-            self.col = b.getPiece()
+            self.col = self.board.getPiece()
 
         self.offs = tuple(zip(*np.where(shapes[self.col])))
         self.rot = 0
@@ -240,7 +243,7 @@ class Piece:
         # Find how far piece can currently fall (for ghost block)
         blocks = 0
 
-        while not(b.piece.collide(b.grid, (0, blocks + 1))):
+        while not(self.board.piece.collide(self.board.grid, (0, blocks + 1))):
             blocks += 1
 
         # Display ghost piece
@@ -249,159 +252,177 @@ class Piece:
                 pos = pygame.Rect((250 // (1920/sizex)) + SIZE * (self.pos[0] + off[0]), (100 // (1080/sizey)) + SIZE * (self.pos[1] + off[1] + blocks), SIZE, SIZE)
                 pygame.draw.rect(display, (100, 100, 100), pos)
 
-# Create board
-b = Board()
+def game():
+    """
+    Function that starts a game and returns score once the game is over
+    """
+    # Create board
+    b = Board()
 
-i = 0
-placed = 1
-lock = 0
-totlock = 0
-locks = [20, 120]
-lines = 0
-lasthold = False
+    i = 0
+    score = 0
+    placed = 1
+    lock = 0
+    totlock = 0
+    locks = [25, 120]
+    lines = 0
+    lasthold = False
 
-# Game loop
-while True:
-    if not(b.piece):
-        # Clear lines that are full
-        for row in range(b.grid.shape[1]):
-            if np.all(b.grid[:,row]):
-                b.grid[:,1:row + 1] = b.grid[:,:row]
-                lines += 1
+    # Game loop
+    while True:
+        if not(b.piece):
+            # Clear lines that are full
+            num = 0
+            for row in range(b.grid.shape[1]):
+                if np.all(b.grid[:,row]):
+                    b.grid[:,1:row + 1] = b.grid[:,:row]
+                    lines += 1
+                    num += 1
 
-        # Create new piece
-        b.piece = Piece(b)
+            score += scores[num] * (1 + lines // 8)
 
-        if b.piece.collide(b.grid, (0, 0)):
-            break
-
-    # Initialize frame state
-    hold = False
-    i += 1
-    placed -= 1
-
-    display.blit(background, [2, 1])
-
-    # Gravity
-    if not(i % (16 - min(15, lines // 4))) and b.piece and not(b.piece.collide(b.grid, (0, 1))):
-        b.piece.move()
-
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit(1)
-
-        # Handle single inputs
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_UP:
-                b.piece.rotate(1)
-                lock = 0
-
-            elif event.key == pygame.K_a:
-                b.piece.rotate(2)
-                lock = 0
-
-            elif event.key == pygame.K_z:
-                b.piece.rotate(-1)
-                lock = 0
-
-            # Place piece if pressed and long enough since last placement
-            elif event.key == pygame.K_SPACE and placed < 0:
-                while not(b.piece.collide(b.grid, (0, 1))):
-                    b.piece.move()
-
-                totlock = locks[1]
-
-            elif event.key == pygame.K_c:
-                hold = True
-
-    # Handle repeated inputs
-    keys = pygame.key.get_pressed()
-
-    if keys[pygame.K_LEFT]:
-        if not(b.piece.collide(b.grid, (-1, 0))) and holdNums[0] in {0, delays[0]}:
-            b.piece.pos[0] -= 1
-
-            if not(holdNums[0]):
-                holdNums[0] = delays[1]
-
-        holdNums[0] = max(holdNums[0] - 1, 0)
-        lock = 0
-
-    else:
-        holdNums[0] = delays[0]
-
-    if keys[pygame.K_RIGHT]:
-        if not(b.piece.collide(b.grid, (1, 0))) and holdNums[1] in {0, delays[0]}:
-            b.piece.pos[0] += 1
-
-            if not(holdNums[1]):
-                holdNums[1] = delays[1]
-
-        holdNums[1] = max(holdNums[1] - 1, 0)
-        lock = 0
-
-    else:
-        holdNums[1] = delays[0]
-
-    if keys[pygame.K_DOWN]:
-        if not(b.piece.collide(b.grid, (0, 1))) and holdNums[2] in {0, delays[0] - 1}:
-            b.piece.move()
-
-            if not(holdNums[2]):
-                holdNums[2] = delays[1] - 4
-
-        holdNums[2] = max(holdNums[2] - 1, 0)
-
-    else:
-        holdNums[2] = delays[0]
-
-    # Render board and pieces
-    b.render()
-
-    if b.piece:
-        b.piece.ghostrender()
-
-    b.piece.render()
-
-    # Place piece if about to hit groud
-    if b.piece.collide(b.grid, (0, 1)):
-        if lock >= locks[0] or totlock >= locks[1]:
-            for off in b.piece.offs:
-                b.grid[tuple(np.array(b.piece.pos) + off)] = b.piece.col
-
-            b.piece = None
-
-            if np.any(b.grid[:,:3]):
-                print("Died")
-                break
-
-            placed = 5
-            lock = 0
-            totlock = 0
-
-            lasthold = False
-
-        else:
-            lock += 1
-            totlock += 1
-
-    # Replace piece if hold is input
-    if hold and not(lasthold) and b.piece:
-        if b.held:
-            n = b.piece.col
-            b.piece = Piece(b, b.held)
-            b.held = n
-
-        else:
-            b.held = b.piece.col
+            # Create new piece
             b.piece = Piece(b)
 
+            if b.piece.collide(b.grid, (0, 0)):
+                return score
+
+        # Initialize frame state
+        hold = False
+        i += 1
+        placed -= 1
+
+        display.blit(background, [2, 1])
+
+        # Gravity
+        if not(i % (16 - min(15, lines // 4))) and b.piece and not(b.piece.collide(b.grid, (0, 1))):
+            b.piece.move()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit(1)
+
+            # Handle single inputs
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    b.piece.rotate(1)
+                    lock = 0
+
+                elif event.key == pygame.K_a:
+                    b.piece.rotate(2)
+                    lock = 0
+
+                elif event.key == pygame.K_z:
+                    b.piece.rotate(-1)
+                    lock = 0
+
+                # Place piece if pressed and long enough since last placement
+                elif event.key == pygame.K_SPACE and placed < 0:
+                    while not(b.piece.collide(b.grid, (0, 1))):
+                        b.piece.move()
+
+                    totlock = locks[1]
+
+                elif event.key == pygame.K_c:
+                    hold = True
+
+        # Handle repeated inputs
+        keys = pygame.key.get_pressed()
+
+        if keys[pygame.K_LEFT] and not keys[pygame.K_RIGHT]:
+            if not(b.piece.collide(b.grid, (-1, 0))) and holdNums[0] in {0, delays[0]}:
+                b.piece.pos[0] -= 1
+
+                if not(holdNums[0]):
+                    holdNums[0] = delays[1]
+
+            holdNums[0] = max(holdNums[0] - 1, 0)
             lock = 0
-            totlock = 0
 
-        lasthold = True
+        else:
+            holdNums[0] = delays[0]
 
-    # Refresh display
-    pygame.display.update()
-    clock.tick(60)
+        if keys[pygame.K_RIGHT] and not keys[pygame.K_LEFT]:
+            if not(b.piece.collide(b.grid, (1, 0))) and holdNums[1] in {0, delays[0]}:
+                b.piece.pos[0] += 1
+
+                if not(holdNums[1]):
+                    holdNums[1] = delays[1]
+
+            holdNums[1] = max(holdNums[1] - 1, 0)
+            lock = 0
+
+        else:
+            holdNums[1] = delays[0]
+
+        if keys[pygame.K_DOWN]:
+            if not(b.piece.collide(b.grid, (0, 1))) and holdNums[2] in {0, delays[0] - 1}:
+                b.piece.move()
+
+                if not(holdNums[2]):
+                    holdNums[2] = delays[1] - 4
+
+            holdNums[2] = max(holdNums[2] - 1, 0)
+
+        else:
+            holdNums[2] = delays[0]
+
+        # Render board and pieces
+        b.render()
+
+        if b.piece:
+            b.piece.ghostrender()
+
+        b.piece.render()
+
+        # Place piece if about to hit groud
+        if b.piece.collide(b.grid, (0, 1)):
+            if lock >= locks[0] or totlock >= locks[1]:
+                for off in b.piece.offs:
+                    b.grid[tuple(np.array(b.piece.pos) + off)] = b.piece.col
+
+                b.piece = None
+
+                if np.any(b.grid[:,:3]):
+                    return score
+
+                placed = 5
+                lock = 0
+                totlock = 0
+
+                lasthold = False
+
+            else:
+                lock += 1
+                totlock += 1
+
+        # Replace piece if hold is input
+        if hold and not(lasthold) and b.piece:
+            if b.held:
+                n = b.piece.col
+                b.piece = Piece(b, b.held)
+                b.held = n
+
+            else:
+                b.held = b.piece.col
+                b.piece = Piece(b)
+
+                lock = 0
+                totlock = 0
+
+            lasthold = True
+
+        # Refresh display
+        pygame.display.update()
+        clock.tick(60)
+
+if __name__ == "__main__":
+    while True:
+        print(game())
+
+        display.blit(background, [2, 1])
+
+        for i in range(60):
+            pygame.display.update()
+            clock.tick(60)
