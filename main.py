@@ -5,7 +5,7 @@ Requires numpy to run.
 
 TODO
   Possibly change input handling to repeat by milliseconds instead of frames.
-  Handle losing.
+  Clean menus and give control instructions.
   Label next and hold pieces.
 """
 
@@ -18,7 +18,6 @@ import numpy as np
 # Initialize pygame
 clock = pygame.time.Clock()
 pygame.display.init()
-
 # Set display size from screen size
 dispInfo = pygame.display.Info()
 sizex, sizey = dispInfo.current_w, dispInfo.current_h
@@ -40,7 +39,8 @@ colors = {
     4: (255, 255, 0),
     5: (255, 128, 0),
     6: (0, 255, 0),
-    7: (0, 0, 255)
+    7: (0, 0, 255),
+    255: (160, 160, 160)
 }
 
 shapes = {
@@ -103,11 +103,24 @@ lkickTable = {
     (0, 3): [(-1, 0), (2, 0), (-1, -2), (2, 1)]
 }
 
-background = pygame.image.load('Tetback.png')
+background = pygame.image.load("Tetback.png")
 
 # Set size based off of screen size
 SIZE = 40 // (1920/sizex)
 background = pygame.transform.scale(background, (SIZE * 48, SIZE * 27))
+
+# Initialize font
+pygame.font.init()
+
+font = pygame.font.SysFont("courier bold", round(2.5 * SIZE))
+smallfont = pygame.font.SysFont("courier bold", round(1.5 * SIZE))
+
+try:
+    with open("banlist.txt") as file:
+        banlist = file.read().split('\n')
+
+except FileNotFoundError:
+    banlist = []
 
 class Board:
     """
@@ -116,7 +129,7 @@ class Board:
     def __init__(self):
         self.piece = None
         self.grid = np.zeros((10, 20), np.uint8)
-        
+
         self.held = None
 
         self.bag = list(shapes.keys())
@@ -252,6 +265,20 @@ class Piece:
                 pos = pygame.Rect((250 // (1920/sizex)) + SIZE * (self.pos[0] + off[0]), (100 // (1080/sizey)) + SIZE * (self.pos[1] + off[1] + blocks), SIZE, SIZE)
                 pygame.draw.rect(display, (100, 100, 100), pos)
 
+def addScore(name, score):
+    with open("scores", "a") as scores:
+        scores.write(f"{name}, {score}\n")
+
+def highScores():
+    try:
+        with open("scores") as scores:
+            scores = scores.read().split('\n')[:-1]
+
+            return sorted(scores, key=lambda x: int(x.split(", ")[1]), reverse=True)[:10]
+
+    except FileNotFoundError:
+        return None
+
 def game():
     """
     Function that starts a game and returns score once the game is over
@@ -279,13 +306,13 @@ def game():
                     lines += 1
                     num += 1
 
-            score += scores[num] * (1 + lines // 8)
+            score += scores[num] * (1 + lines // 4)
 
             # Create new piece
             b.piece = Piece(b)
 
             if b.piece.collide(b.grid, (0, 0)):
-                return score
+                return b, score
 
         # Initialize frame state
         hold = False
@@ -385,7 +412,7 @@ def game():
                 b.piece = None
 
                 if np.any(b.grid[:,:3]):
-                    return score
+                    return b, score
 
                 placed = 5
                 lock = 0
@@ -419,10 +446,68 @@ def game():
 
 if __name__ == "__main__":
     while True:
-        print(game())
+        title = font.render("Tetris", True, (255, 255, 255))
+
+        waiting = True
+
+        while waiting:
+            display.fill((0, 0, 0))
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit(1)
+
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
+                    waiting = False
+
+            display.blit(title, (SIZE * 20, SIZE * 2))
+
+            for i, score in enumerate(highScores()):
+                display.blit(smallfont.render(score, True, (255, 255, 255)), (SIZE * 18, round(1.6 * SIZE * (4 + i))))
+
+            pygame.display.update()
+
+        board, score = game()
 
         display.blit(background, [2, 1])
 
-        for i in range(60):
+        board.grid[np.where(board.grid)] = 255
+        board.render()
+        for _ in range(60):
+            pygame.display.update()
+            clock.tick(60)
+
+        scoretext = font.render(f"Score: {score} pts.", True, (255, 255, 255))
+        prompt = font.render("Enter Name", True, (255, 255, 255))
+
+        name = ""
+
+        while score:
+            display.fill((0, 0, 0))
+            display.blit(scoretext, (SIZE * 3, SIZE * 3))
+            display.blit(prompt, (SIZE * 3, SIZE * 8))
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit(1)
+
+                elif event.type == pygame.KEYDOWN:
+                    if event.key >= 97 and event.key <= 122 and len(name) < 3:
+                        letter = chr(event.key).upper()
+                        if name + letter not in banlist:
+                            name += letter
+                    
+                    elif event.key == pygame.K_BACKSPACE:
+                        name = name[:-1]
+
+                    elif event.key == pygame.K_RETURN and name:
+                        addScore(name, score)
+                        score = 0
+
+            nametext = font.render(name, True, (255, 255, 255))
+            display.blit(nametext, (SIZE * 3, SIZE * 10.5))
+
             pygame.display.update()
             clock.tick(60)
