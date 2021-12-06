@@ -89,7 +89,7 @@ kickTable = {
     (2, 1): [(-1, 0), (-1, -1), (0, 2), (-1, 2)],
     (2, 3): [(1, 0), (1, -1), (0, 2), (1, 2)],
     (3, 2): [(-1, 0), (-1, 1), (0, -2), (-1, -2)],
-    (3, 0): [(-1, 0), (-1, -1), (0, 2), (-1, -2)],
+    (3, 0): [(-1, 0), (-1, 1), (0, 2), (-1, -2)],
     (0, 3): [(1, 0), (1, -1), (0, 2), (1, 2)]
 }
 lkickTable = {
@@ -272,9 +272,9 @@ def addScore(name, score):
 def highScores():
     try:
         with open("scores") as scores:
-            scores = scores.read().split('\n')[:-1]
+            scores = [score.split(", ") for score in scores.read().split('\n')[:-1]]
 
-            return sorted(scores, key=lambda x: int(x.split(", ")[1]), reverse=True)[:10]
+            return sorted(scores, key=lambda x: int(x[1]), reverse=True)[:10]
 
     except FileNotFoundError:
         return None
@@ -291,7 +291,7 @@ def game():
     placed = 1
     lock = 0
     totlock = 0
-    locks = [25, 120]
+    locks = [30, 110]
     lines = 0
     lasthold = False
 
@@ -306,7 +306,7 @@ def game():
                     lines += 1
                     num += 1
 
-            score += scores[num] * (1 + lines // 4)
+            score += scores[num] * min(16, (1 + lines // 4))
 
             # Create new piece
             b.piece = Piece(b)
@@ -435,8 +435,8 @@ def game():
                 b.held = b.piece.col
                 b.piece = Piece(b)
 
-                lock = 0
-                totlock = 0
+            lock = 0
+            totlock = 0
 
             lasthold = True
 
@@ -461,10 +461,11 @@ if __name__ == "__main__":
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
                     waiting = False
 
-            display.blit(title, (SIZE * 20, SIZE * 2))
+            display.blit(title, (SIZE * 22, SIZE * 2))
 
-            for i, score in enumerate(highScores()):
-                display.blit(smallfont.render(score, True, (255, 255, 255)), (SIZE * 18, round(1.6 * SIZE * (4 + i))))
+            for i, (name, score) in enumerate(highScores()):
+                display.blit(smallfont.render(name, True, (255, 255, 255)), (SIZE * 18, round(1.6 * SIZE * (4 + i))))
+                display.blit(smallfont.render(score, True, (255, 255, 255)), (SIZE * 24, round(1.6 * SIZE * (4 + i))))
 
             pygame.display.update()
 
@@ -474,7 +475,8 @@ if __name__ == "__main__":
 
         board.grid[np.where(board.grid)] = 255
         board.render()
-        for _ in range(60):
+
+        for _ in range(120):
             pygame.display.update()
             clock.tick(60)
 
@@ -504,6 +506,9 @@ if __name__ == "__main__":
 
                     elif event.key == pygame.K_RETURN and name:
                         addScore(name, score)
+                        score = 0
+
+                    elif event.key == pygame.K_ESCAPE and not(name):
                         score = 0
 
             nametext = font.render(name, True, (255, 255, 255))
