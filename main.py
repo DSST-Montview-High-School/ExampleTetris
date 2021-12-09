@@ -5,8 +5,7 @@ Requires numpy to run.
 
 TODO
   Possibly change input handling to repeat by milliseconds instead of frames.
-  Clean menus and give control instructions.
-  Label next and hold pieces.
+  General refactoring
 """
 
 import random
@@ -104,6 +103,7 @@ lkickTable = {
 }
 
 background = pygame.image.load("Tetback.png")
+title = pygame.image.load("Title.png")
 
 # Set size based off of screen size
 SIZE = 40 // (1920/sizex)
@@ -145,7 +145,7 @@ class Board:
 
                 if col:
                     # Draw square at potion based off of screen size
-                    pos = pygame.Rect((250 // (1920/sizex)) + SIZE * x, (100 // (1080/sizey)) + SIZE * y, SIZE, SIZE)
+                    pos = pygame.Rect((290 // (1920/sizex)) + SIZE * x, (100 // (1080/sizey)) + SIZE * y, SIZE, SIZE)
                     pygame.draw.rect(display, colors[col], pos)
 
         for i in range(4):
@@ -246,7 +246,7 @@ class Piece:
         """
         for off in self.offs:
             if self.pos[1] + off[1] > 2:
-                pos = pygame.Rect((250 // (1920/sizex)) + SIZE * (self.pos[0] + off[0]), (100 // (1080/sizey)) + SIZE * (self.pos[1] + off[1]), SIZE, SIZE)
+                pos = pygame.Rect((290 // (1920/sizex)) + SIZE * (self.pos[0] + off[0]), (100 // (1080/sizey)) + SIZE * (self.pos[1] + off[1]), SIZE, SIZE)
                 pygame.draw.rect(display, colors[self.col], pos)
 
     def ghostrender(self):
@@ -262,7 +262,7 @@ class Piece:
         # Display ghost piece
         for off in self.offs:
             if self.pos[1] + off[1] + blocks > 2:
-                pos = pygame.Rect((250 // (1920/sizex)) + SIZE * (self.pos[0] + off[0]), (100 // (1080/sizey)) + SIZE * (self.pos[1] + off[1] + blocks), SIZE, SIZE)
+                pos = pygame.Rect((290 // (1920/sizex)) + SIZE * (self.pos[0] + off[0]), (100 // (1080/sizey)) + SIZE * (self.pos[1] + off[1] + blocks), SIZE, SIZE)
                 pygame.draw.rect(display, (100, 100, 100), pos)
 
 def addScore(name, score):
@@ -441,7 +441,7 @@ def game():
 
             lasthold = True
 
-        display.blit(font.render(str(score), True, (255, 255, 255)), (SIZE * 38, SIZE * 3))
+        display.blit(font.render(f"Score: {score}", True, (255, 255, 255)), (SIZE * 34, SIZE * 3))
 
         # Refresh display
         pygame.display.update()
@@ -449,7 +449,6 @@ def game():
 
 if __name__ == "__main__":
     while True:
-        title = font.render("Tetris", True, (255, 255, 255))
         starttext = font.render("Enter to Start", True, (255, 255, 255))
 
         waiting = True
@@ -465,12 +464,12 @@ if __name__ == "__main__":
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
                     waiting = False
 
-            display.blit(title, (SIZE * 22, SIZE * 2))
+            display.blit(title, (SIZE * 18.5, SIZE * 2))
             display.blit(starttext, (SIZE * 33, SIZE * 24))
 
             for i, (name, score) in enumerate(highScores()):
-                display.blit(smallfont.render(name, True, (255, 255, 255)), (SIZE * 19, round(1.6 * SIZE * (4 + i))))
-                display.blit(smallfont.render(score, True, (255, 255, 255)), (SIZE * 26, round(1.6 * SIZE * (4 + i))))
+                display.blit(smallfont.render(name, True, (255, 255, 255)), (SIZE * 19, round(1.55 * SIZE * (5 + i))))
+                display.blit(smallfont.render(score, True, (255, 255, 255)), (SIZE * 26, round(1.55 * SIZE * (5 + i))))
 
             pygame.display.update()
 
@@ -481,7 +480,7 @@ if __name__ == "__main__":
         board.grid[np.where(board.grid)] = 255
         board.render()
 
-        display.blit(font.render(str(score), True, (255, 255, 255)), (SIZE * 38, SIZE * 3))
+        display.blit(font.render(f"Score: {score}", True, (255, 255, 255)), (SIZE * 34, SIZE * 3))
 
         for _ in range(120):
             pygame.event.clear()
