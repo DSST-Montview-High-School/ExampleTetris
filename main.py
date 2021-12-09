@@ -303,10 +303,11 @@ def game():
             for row in range(b.grid.shape[1]):
                 if np.all(b.grid[:,row]):
                     b.grid[:,1:row + 1] = b.grid[:,:row]
-                    lines += 1
                     num += 1
 
-            score += scores[num] * min(16, (1 + lines // 4))
+            # Add score (double if perfect clear)
+            score += (scores[num] * min(21, 1 + lines // 4)) * (2 if not(np.any(b.grid)) else 1)
+            lines += num
 
             # Create new piece
             b.piece = Piece(b)
@@ -322,7 +323,7 @@ def game():
         display.blit(background, [2, 1])
 
         # Gravity
-        if not(i % (16 - min(15, lines // 4))) and b.piece and not(b.piece.collide(b.grid, (0, 1))):
+        if not(i % (20 - min(19, lines // 4))) and b.piece and not(b.piece.collide(b.grid, (0, 1))):
             b.piece.move()
 
         for event in pygame.event.get():
@@ -440,13 +441,16 @@ def game():
 
             lasthold = True
 
+        display.blit(font.render(str(score), True, (255, 255, 255)), (SIZE * 38, SIZE * 3))
+
         # Refresh display
         pygame.display.update()
-        clock.tick(60)
+        clock.tick(max(60, lines // 2 + 20))
 
 if __name__ == "__main__":
     while True:
         title = font.render("Tetris", True, (255, 255, 255))
+        starttext = font.render("Enter to Start", True, (255, 255, 255))
 
         waiting = True
 
@@ -462,10 +466,11 @@ if __name__ == "__main__":
                     waiting = False
 
             display.blit(title, (SIZE * 22, SIZE * 2))
+            display.blit(starttext, (SIZE * 33, SIZE * 24))
 
             for i, (name, score) in enumerate(highScores()):
-                display.blit(smallfont.render(name, True, (255, 255, 255)), (SIZE * 18, round(1.6 * SIZE * (4 + i))))
-                display.blit(smallfont.render(score, True, (255, 255, 255)), (SIZE * 24, round(1.6 * SIZE * (4 + i))))
+                display.blit(smallfont.render(name, True, (255, 255, 255)), (SIZE * 19, round(1.6 * SIZE * (4 + i))))
+                display.blit(smallfont.render(score, True, (255, 255, 255)), (SIZE * 26, round(1.6 * SIZE * (4 + i))))
 
             pygame.display.update()
 
@@ -476,7 +481,13 @@ if __name__ == "__main__":
         board.grid[np.where(board.grid)] = 255
         board.render()
 
+        display.blit(font.render(str(score), True, (255, 255, 255)), (SIZE * 38, SIZE * 3))
+
         for _ in range(120):
+            pygame.event.clear()
+            if pygame.key.get_pressed()[pygame.K_ESCAPE]:
+                break
+
             pygame.display.update()
             clock.tick(60)
 
@@ -489,6 +500,9 @@ if __name__ == "__main__":
             display.fill((0, 0, 0))
             display.blit(scoretext, (SIZE * 3, SIZE * 3))
             display.blit(prompt, (SIZE * 3, SIZE * 8))
+
+            display.blit(font.render("Enter to Submit", True, (255, 255, 255)), (SIZE * 32, SIZE * 21))
+            if not(name): display.blit(font.render("Esc to Cancel", True, (255, 255, 255)), (SIZE * 32, SIZE * 23.5))
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
