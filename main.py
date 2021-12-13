@@ -14,6 +14,9 @@ import sys
 import pygame
 import numpy as np
 
+# Flag for being on display (disable closing and show club message)
+DISPLAY = sys.argv[-1] == "-d"
+
 # Initialize pygame
 clock = pygame.time.Clock()
 pygame.display.init()
@@ -327,7 +330,7 @@ def game():
             b.piece.move()
 
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
+            if event.type == pygame.QUIT and not(DISPLAY):
                 pygame.quit()
                 sys.exit(1)
 
@@ -450,6 +453,12 @@ def game():
 if __name__ == "__main__":
     while True:
         starttext = font.render("Enter to Start", True, (255, 255, 255))
+        clubtext = [
+            smallfont.render("Join the coding club", True, (255, 255, 255)),
+            smallfont.render("Mondays afterschool", True, (255, 255, 255)),
+            smallfont.render("from 3:30 to 4:30 in", True, (255, 255, 255)),
+            smallfont.render("this room if interested!", True, (255, 255, 255))
+        ]
 
         waiting = True
 
@@ -457,7 +466,7 @@ if __name__ == "__main__":
             display.fill((0, 0, 0))
 
             for event in pygame.event.get():
-                if event.type == pygame.QUIT:
+                if event.type == pygame.QUIT and not(DISPLAY):
                     pygame.quit()
                     sys.exit(1)
 
@@ -470,6 +479,10 @@ if __name__ == "__main__":
             for i, (name, score) in enumerate(highScores()):
                 display.blit(smallfont.render(name, True, (255, 255, 255)), (SIZE * 19, round(1.55 * SIZE * (5 + i))))
                 display.blit(smallfont.render(score, True, (255, 255, 255)), (SIZE * 26, round(1.55 * SIZE * (5 + i))))
+
+            if DISPLAY:
+                for i, text in enumerate(clubtext):
+                    display.blit(text, (SIZE * 34, SIZE * (3 + i)))
 
             pygame.display.update()
 
@@ -504,7 +517,7 @@ if __name__ == "__main__":
             if not(name): display.blit(font.render("Esc to Cancel", True, (255, 255, 255)), (SIZE * 32, SIZE * 23.5))
 
             for event in pygame.event.get():
-                if event.type == pygame.QUIT:
+                if event.type == pygame.QUIT and not(DISPLAY):
                     pygame.quit()
                     sys.exit(1)
 
